@@ -7,6 +7,9 @@ __pycache__/
 data
 clusters
 
+# VSCODE
+workspace.code-workspace
+
 # C extensions
 *.so
 
