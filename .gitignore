@@ -6,6 +6,7 @@ __pycache__/
 # data dir
 data
 clusters
+output
 
 # VSCODE
 workspace.code-workspace

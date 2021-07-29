@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 
-def time_filter(dframe, TIME_MAX, UNIT):
+def time_filter(dframe, TIME_MIN, TIME_MAX, UNIT):
     '''
     This function is used to filter events according to their duration.
 
@@ -15,10 +15,13 @@ def time_filter(dframe, TIME_MAX, UNIT):
     return: type(DataFrame) -> Time filtered track events 
     '''
     uids_ = []
-    dframe.groupby('uid').apply(lambda x: uids_.extend(x.uid.values) if
+    dframe.groupby('uid').apply(lambda x: uids_.extend(x.uid.values)
+                                if pd.to_datetime(x.iloc[-1].timestamp) - pd.to_datetime(x.iloc[0].timestamp)
+                                <= pd.Timedelta(TIME_MAX, unit=UNIT)
+                                and
                                 pd.to_datetime(
                                     x.iloc[-1].timestamp) - pd.to_datetime(x.iloc[0].timestamp)
-                                >= pd.Timedelta(TIME_MAX, unit=UNIT) else None)
+                                >= pd.Timedelta(TIME_MIN, unit=UNIT) else None)
 
     uids_ = np.unique(uids_)[np.unique(uids_) != -1].tolist()
     return dframe.query('uid == @uids_')
