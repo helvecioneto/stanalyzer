@@ -13,4 +13,8 @@ def read_file(path=None):
     try:
         return pd.read_pickle(path)
     except:
+        try:
+            return pd.read_pickle(path,compression='xz')
+        except:
+            print('File not found or path parameter is incorrect.') 
         print('File not found or path parameter is incorrect.') 
