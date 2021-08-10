@@ -11,6 +11,7 @@ output
 # VSCODE
 workspace.code-workspace
 .vscode/
+.DS_Store
 
 # C extensions
 *.so
