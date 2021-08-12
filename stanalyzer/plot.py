@@ -8,6 +8,7 @@ import datashader as ds
 import datashader.transfer_functions as tf
 from matplotlib.colors import LinearSegmentedColormap
 from colorcet import rainbow
+from scipy.stats import circmean,circvar,circstd
 import json
 import plotly.express as px
 import plotly.graph_objects as go
@@ -102,7 +103,7 @@ def track(dframe,var='DBZc',level=5):
         return print('Invalid DataFrame!')
 
     ## GET LAST TIME
-    time = dframe.reset_index()['time'].values[-1]
+    time = sorted(dframe.reset_index()['time'])[-1]
 
     # GET TRHESHOLDS
     THRESHOLDS = [int(c[-2:]) for c in dframe.columns if 'geom_' in c and 'intersect' not in c]
@@ -150,27 +151,27 @@ def track(dframe,var='DBZc',level=5):
                 font_size=14,
                 font_family="Rockwell")
     
-    hover_temp = "<b>DATE: %{customdata[0]} </b><br>" + \
-                 "<b>UID:</b> %{customdata[1]}        <b>STATUS:</b> %{customdata[2]}<br>" + \
-                 "<b>LIFE: </b>: %{customdata[3]}<br><br>" + \
-                 "<b>VELOCITY: </b>       %{customdata[4]} km/h<br>" + \
-                 "<b>DIRECTION: </b>     %{customdata[5]} º<br><br>" + \
-                 "<b>MAX_REF</b>:          %{customdata[6]} dBZ<br>" + \
-                 "<b>MEAN_REF_"+str(THRESHOLDS[0])+"</b>: %{customdata[7]} dBZ<br>" + \
-                 "<b>MEAN_REF_"+str(THRESHOLDS[1])+"</b>: %{customdata[8]} dBZ<br>" + \
-                 "<b>MEAN_REF_"+str(THRESHOLDS[2])+"</b>: %{customdata[9]} dBZ<br><br>" + \
-                 "<b>DMEAN_REF_"+str(THRESHOLDS[0])+"</b>: %{customdata[10]} dBZ<br>" + \
-                 "<b>DMEAN_REF_"+str(THRESHOLDS[1])+"</b>: %{customdata[11]} dBZ<br>" + \
-                 "<b>DMEAN_REF_"+str(THRESHOLDS[2])+"</b>: %{customdata[12]} dBZ<br><br>" + \
-                 "<b>AREA_"+str(THRESHOLDS[0])+"</b>:          %{customdata[13]} km²<br>" + \
-                 "<b>AREA_"+str(THRESHOLDS[1])+"</b>:          %{customdata[14]} km²<br>" + \
-                 "<b>AREA_"+str(THRESHOLDS[2])+"</b>:          %{customdata[15]} km²<br><br>" + \
-                 "<b>SIZE_"+str(THRESHOLDS[0])+"</b>:          %{customdata[16]} pixels<br>" + \
-                 "<b>SIZE_"+str(THRESHOLDS[1])+"</b>:          %{customdata[17]} pixels<br>" + \
-                 "<b>SIZE_"+str(THRESHOLDS[2])+"</b>:          %{customdata[18]} pixels<br><br>" + \
-                 "<b>DSIZE_"+str(THRESHOLDS[0])+"</b>:          %{customdata[19]} pixels<br>" + \
-                 "<b>DSIZE_"+str(THRESHOLDS[1])+"</b>:          %{customdata[20]} pixels<br>" + \
-                 "<b>DSIZE_"+str(THRESHOLDS[2])+"</b>:          %{customdata[21]} pixels<br><br>" + \
+    hover_temp = "<b>%{meta[0]}: %{customdata[0]} </b><br>" + \
+                 "<b>%{meta[1]}:</b> %{customdata[1]}        <b>STATUS:</b> %{customdata[2]}<br>" + \
+                 "<b>%{meta[3]}: </b>: %{customdata[3]}<br><br>" + \
+                 "<b>%{meta[4]}: </b>       %{customdata[4]} km/h<br>" + \
+                 "<b>%{meta[5]}: </b>     %{customdata[5]} º<br><br>" + \
+                 "<b>%{meta[6]}</b>:          %{customdata[6]} dBZ<br>" + \
+                 "<b>%{meta[7]}</b>:  %{customdata[7]} dBZ<br>" + \
+                 "<b>%{meta[8]}</b>:  %{customdata[8]} dBZ<br>" + \
+                 "<b>%{meta[9]}</b>:  %{customdata[9]} dBZ<br><br>" + \
+                 "<b>%{meta[10]}</b>: %{customdata[10]} dBZ<br>" + \
+                 "<b>%{meta[11]}</b>: %{customdata[11]} dBZ<br>" + \
+                 "<b>%{meta[12]}</b>: %{customdata[12]} dBZ<br><br>" + \
+                 "<b>%{meta[13]}</b>: %{customdata[13]} km²<br>" + \
+                 "<b>%{meta[14]}</b>: %{customdata[14]} km²<br>" + \
+                 "<b>%{meta[15]}</b>: %{customdata[15]} km²<br><br>" + \
+                 "<b>%{meta[16]}</b>: %{customdata[16]} pixels<br>" + \
+                 "<b>%{meta[17]}</b>: %{customdata[17]} pixels<br>" + \
+                 "<b>%{meta[18]}</b>: %{customdata[18]} pixels<br><br>" + \
+                 "<b>%{meta[19]}</b>: %{customdata[19]} pixels<br>" + \
+                 "<b>%{meta[20]}</b>: %{customdata[20]} pixels<br>" + \
+                 "<b>%{meta[21]}</b>: %{customdata[21]} pixels<br><br>" + \
                  "LON: %{lon}   LAT: %{lat}<br><extra></extra>"
     
     ## MARKER AND COLORBAR         
@@ -214,7 +215,7 @@ def track(dframe,var='DBZc',level=5):
                   ]
     
     ## Data
-    data = go.Scattermapbox(customdata=gd_t[columns_int].round(2).fillna(0),
+    data = go.Scattermapbox(customdata=gd_t[columns_int].round(2).fillna(0),meta=[each_string.upper() for each_string in columns_int],
                         lat=list(gd_t["lat"]), lon=list(gd_t["lon"]))
     
     ## Mount Figure
@@ -279,75 +280,166 @@ def degToCompass(d):
 
 
 ## WIND PLOT
-def plot_wind(df, style = 'bar'):
+def plot_wind(df, style = 'standard'):
     
-    vel_cols = [c for c in df.columns if 'vel_' in c and 'orig' not in c]
-    angle_cols = [c for c in df.columns if 'angle_' in c and 'orig' not in c]
-    
-    series = df.groupby(['uid']).apply(lambda x: [x.uid.unique()[0],x[vel_cols[0]].values.flatten(),x[angle_cols[0]].values.flatten(),x.timestamp.values])
+    if style != 'standard':
+        vel_cols = [c for c in df.columns if 'vel_' in c and 'orig' not in c]
+        angle_cols = [c for c in df.columns if 'angle_' in c and 'orig' not in c]
+        
+        series = df.groupby(['uid']).apply(lambda x: [x.uid.unique()[0],x[vel_cols[0]].values.flatten(),x[angle_cols[0]].values.flatten(),x.timestamp.values])
+        wind_dir = pd.DataFrame(columns=['uid','timestamp','velocity','direction'])
+        for e in series.keys():
+            for ee in  range(len(series[e][1])):
+                wind_dir = wind_dir.append({'uid':e,
+                                            'timestamp':series[e][-1][ee],
+                                            'velocity':series[e][1][ee],
+                                            'direction':series[e][2][ee]},ignore_index=True)
 
-    wind_dir = pd.DataFrame(columns=['uid','timestamp','velocity','direction'])
-
-    for e in series.keys():
-        for ee in  range(len(series[e][1])):
-            wind_dir = wind_dir.append({'uid':e,
-                                        'timestamp':series[e][-1][ee],
-                                        'velocity':series[e][1][ee],
-                                        'direction':series[e][2][ee]},ignore_index=True)
-
-
-    wind_frame = pd.DataFrame(columns=['uid','direction','strength','velocity'])
-    vel_g = wind_dir.groupby(pd.cut(wind_dir['velocity'], np.arange(0, 100, 10)))
-    for i,g in vel_g:
-        for value in range(len(g.uid.values)):
-            wind_frame = wind_frame.append({'uid':g.uid.values[value],
-                                            'timestamp':g.timestamp.values[value],
-                                            'strength':str(str(i.left)+'-'+str(i.right))+' km/h',
-                                            'direction':g.direction.values[value],
-                                            'velocity':g.velocity.values[value],
-                                            },ignore_index=True)
-
-    if style == 'bar':
-#        wind_frame['angle'] = wind_frame['direction']
-    #     wind_frame['direction'] = wind_frame['direction'].apply(degToCompass)
-        fig = px.bar_polar(wind_frame, r="velocity", theta="direction",template="presentation",
-                       color="strength", labels={"strength": "Wind Speed:"},
-                       base='strength',hover_data=wind_frame,hover_name='uid',start_angle=90,
+        wind_frame = pd.DataFrame(columns=['uid','direction','strength','velocity'])
+        vel_g = wind_dir.groupby(pd.cut(wind_dir['velocity'], np.arange(0, 100, 10)))
+        for i,g in vel_g:
+            for value in range(len(g.uid.values)):
+                wind_frame = wind_frame.append({'uid':g.uid.values[value],
+                                                'timestamp':g.timestamp.values[value],
+                                                'strength':str(str(i.left)+'-'+str(i.right))+' km/h',
+                                                'direction':g.direction.values[value],
+                                                'velocity':g.velocity.values[value],
+                                                },ignore_index=True)
+        if style == 'bar':
+    #        wind_frame['angle'] = wind_frame['direction']
+        #     wind_frame['direction'] = wind_frame['direction'].apply(degToCompass)
+            fig = px.bar_polar(wind_frame, r="velocity", theta="direction",template="presentation",
+                           color="strength", labels={"strength": "Wind Speed:"},direction='counterclockwise',
+                           base='strength',hover_data=wind_frame,hover_name='uid',start_angle=0,
+                           color_discrete_sequence= px.colors.sequential.Plasma_r)
+        if style == 'scatter':
+            fig = px.scatter_polar(wind_frame, r="velocity", theta="direction",template="presentation",
+                       color="strength", labels={"strength": "Wind Speed:"},direction='counterclockwise',
+                       hover_data=wind_frame, hover_name='uid',start_angle=0,
                        color_discrete_sequence= px.colors.sequential.Plasma_r)
-    if style == 'scatter':
-        fig = px.scatter_polar(wind_frame, r="velocity", theta="direction",template="presentation",
-                   color="strength", labels={"strength": "Wind Speed:"},
-                   hover_data=wind_frame, hover_name='uid',start_angle=90,
-                   color_discrete_sequence= px.colors.sequential.Plasma_r)
 
-    fig.add_shape(
-        type="circle",
-                xref="paper",
-                yref="paper",
-                x0=0.4,
-                y0=0.4,
-                x1=0.6,
-                y1=0.6,
-                line_color="Black",
-                fillcolor="White",
-                # text="Calm"
-    )
 
-    fig.add_annotation( # add a text callout with arrow
-        text="Wind Rose", x=0.5, y=0.5, showarrow=False
-    )
+        fig.update_layout(width=600, height=600, margin={"r":0,"t":0,"l":100,"b":0,"pad":100})
+        fig.update_layout(title_text='Wind Rose: '+style, title_x=0.45,title_y=0.86,font_size=12)
+        fig.update_layout(legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=.8,
+                x=1.1,
+                xanchor="left"),
+                polar=dict(radialaxis=dict(showticklabels=True, ticks='', linewidth=0)
+                )
+            )
+        fig.show()
+        
+        return wind_frame.sort_values(by='timestamp')
+    else:
+        df = df.reset_index()
+        df = df.sort_values(by='time')
 
-    fig.update_layout(width=500, height=500)
-    fig.update_layout(title_text='Wind Rose ', title_x=0.5,font_size=12)
-    fig.update_layout(legend=dict(
-        orientation="h",
-        yanchor="top",
-        y=-0.1,
-        xanchor="center",
-        x=0.5),
-        polar=dict(radialaxis=dict(showticklabels=True, ticks='', linewidth=0)
+        ## Templates
+        hover_info = dict(bgcolor="white",
+                    font_size=14,
+                    font_family="Rockwell")
+
+        hover_temp = "<b>DATE: %{meta} </b><br>" + \
+                     "<b>%{hovertext} </b> <br>" + \
+                     "<b>MEAN_VEL: %{r} in km/h<br>"+ \
+                     "<b>MEAN_ANGLE: %{theta}<br><extra></extra>"
+
+        times = df.timestamp.unique()
+        vel_cols = [c for c in df.columns if 'vel_' in c and 'orig' not in c and 'level_' not in c]
+        angle_cols = [c for c in df.columns if 'angle_' in c and 'orig' not in c and 'level_' not in c]
+
+        fig = go.Figure()
+
+        for t in times:
+            uids = df.query('timestamp == @t').uid.unique().tolist()
+            angles = []
+            velocities = []
+            stds = []
+            uid_ = [] 
+            
+            for ud in uids:
+                loocked_df = df.query('uid == @ud and timestamp <= @t')
+                if len(loocked_df[vel_cols[0]].dropna().values) > 0:
+                    angles.append(circmean(loocked_df[angle_cols[0]],nan_policy='omit',high=360))
+                    velocities.append(loocked_df[vel_cols[0]].mean())
+                    stds.append(circvar(loocked_df[angle_cols[0]],nan_policy='omit'))
+                    uid_.append('UID: '+str(ud))
+
+            if len(angles) > 0:
+                fig.add_trace(go.Barpolar(
+                    r=velocities,
+                    theta=angles,
+                    marker_color=uids,
+                    width=np.array(stds)+10,
+                    marker_line_color="black",
+                    marker_line_width=2,
+                    hovertext=uid_,
+                    opacity=0.8,
+                    ids=uids,
+                    name=t,
+                    meta=t,
+                    hoverlabel=hover_info,
+                    hovertemplate=hover_temp
+                ))     
+
+        fig.update_layout(
+            template=None,
+            polar = dict(
+                radialaxis = dict(range=[0, 120], showticklabels=True),
+                angularaxis = dict(showticklabels=True, ticks='')
+            )
         )
-    )
-    fig.show()
+
+        fig.update_layout(width=600, height=600, margin={"r":0,"t":0,"l":100,"b":0,"pad":100})
+        fig.update_layout(title_text='Wind Rose', title_x=0.44,title_y=0.84,font_size=12)
+        fig.update_layout(legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=.8,
+                x=1.1,
+                xanchor="left"),
+                polar=dict(radialaxis=dict(showticklabels=True, ticks='', linewidth=0)
+                )
+            )
+
+        fig.show()
+
+def plot_lines(df, analyze_columns = None, axis_name = None):
+    analize_cols = analyze_columns.copy()
+    analyze_columns.insert(0,'timestamp')
+    analyze_columns.insert(0,'uid')
     
-    return wind_frame.sort_values(by='timestamp')
+    orig_df = df.copy()
+    df = df[analyze_columns].sort_values(by='timestamp')
+#     df = df.round(2).fillna(0)
+    dfg = df[analyze_columns].groupby('uid')
+    
+    dashs = ['solid','dot','dash','dashdot']
+    cnt=0
+    
+    ## Templates
+    hover_info = dict(bgcolor="white",
+                font_size=14,
+                font_family="Rockwell")
+    
+    hover_temp = "<b>%{meta}:</b> %{y} <br><br>" + \
+                 "<b>DATE: %{customdata[0]} </b><br>" + \
+                 "<b>UID: %{customdata[2]} </b>                 <b>TIME: %{customdata[1]} </b><br><extra></extra>"
+
+    fig = go.Figure()
+    for c in analyze_columns[2:]:
+        for i,g in dfg:
+            fig.add_trace(go.Scatter(x=g.timestamp.values,y=g[c].values,
+                                     name=c+' - UID: '+str(g.uid.unique()[0]),meta=c.upper(),
+                                     customdata=orig_df.loc[g.index],mode="markers+lines",
+                                     hoverlabel=hover_info,hovertemplate=hover_temp,
+                                     visible=True, line=dict(width=2, dash=dashs[cnt])))
+        cnt += 1
+        
+    fig.update_layout(height=400,width=900, margin={"r":0,"t":40,"l":100,"b":0,"pad":0})
+    fig.update_layout(title_text='Analized Columns: '+str(analize_cols)[1:-1], title_x=0.2,
+                      yaxis_title=axis_name)
+    fig.show()
