@@ -16,11 +16,11 @@ warnings.filterwarnings('ignore')
 
 
 ## Read NETCDF
-def ncdf(nc_file,VAR,LEVEL):
+def ncdf(nc_file,var='DBZc',level=5):
     ## OPEN RADAR DATA COMPRESS
     with gzip.open(nc_file) as gz:
         with netCDF4.Dataset('dummy', mode='r', memory=gz.read()) as nc:
-            data = nc.variables[VAR][0][LEVEL][:].filled()
+            data = nc.variables[var][0][level][:].filled()
             lon = nc.variables['lon0'][:].filled()
             lat = nc.variables['lat0'][:].filled()
     return data,lon,lat
@@ -94,11 +94,22 @@ def geom_layers(dframe_,time_):
     return layers
 
 
-def track(dframe,VAR,LEVEL,THRESHOLDS,time):
+## PLOT TRACK
+def track(dframe,var='DBZc',level=5):
+
+    ## VERIFY DATA FRAME
+    if len(dframe) < 1:
+        return print('Invalid DataFrame!')
+
+    ## GET LAST TIME
+    time = dframe.reset_index()['time'].values[-1]
+
+    # GET TRHESHOLDS
+    THRESHOLDS = [int(c[-2:]) for c in dframe.columns if 'geom_' in c and 'intersect' not in c]
 
     ### NC_FILE FROM TIME
     nc_path = dframe.loc[dframe['time'] == time]['nc_file'].unique()[0]
-    data,lon,lat = ncdf(nc_path,VAR,LEVEL)
+    data,lon,lat = ncdf(nc_path,var,level)
     ## NO DATA TO NAN
     data[data == -9999] = np.nan
     
@@ -168,7 +179,7 @@ def track(dframe,VAR,LEVEL,THRESHOLDS,time):
                                 colorscale=rainbow,
                                 cmin=-30,cmax=75,
                                 colorbar=dict(
-                                   title = VAR,
+                                   title = var,
                                    titleside='right',
                                    thicknessmode='pixels',
                                    thickness=20,           
@@ -217,55 +228,126 @@ def track(dframe,VAR,LEVEL,THRESHOLDS,time):
     
     ## Buttons
     fig.update_layout(
-        updatemenus=[
-            dict(
-                type="buttons",
-                buttons=[
-                    dict(label="None",
-                         method="relayout",
-                         args=["mapbox.layers",[layers_[-1]]]),
-                    
-                    dict(label="All",
-                         method="relayout",
-                         args=["mapbox.layers",layers_]),
-                    
-                    dict(label="Clusters "+str(THRESHOLDS[-3])+' dBZ',
-                         method="relayout",
-                         args=["mapbox.layers",[layers_[-4]]]),
-                    
-                    dict(label="Clusters "+str(THRESHOLDS[-2])+' dBZ',
-                         method="relayout",
-                         args=["mapbox.layers",[layers_[-3]]]),
-                    
-                    dict(label="Clusters "+str(THRESHOLDS[-1])+' dBZ',
-                         method="relayout",
-                         args=["mapbox.layers",[layers_[-2]]]),
-                    
-                    dict(label="Geometries "+str(THRESHOLDS[0])+' dBZ',
-                         method="relayout",
-                         args=["mapbox.layers",[layers_[0],layers_[-1]]]),
-                    
-                    dict(label="Geometries "+str(THRESHOLDS[1])+' dBZ',
-                         method="relayout",
-                         args=["mapbox.layers",[layers_[1],layers_[-1]]]),
-                    
-                    dict(label="Geometries "+str(THRESHOLDS[2])+' dBZ',
-                         method="relayout",
-                         args=["mapbox.layers",[layers_[2],layers_[-1]]]),
-                    
-                    dict(label="Trajectory",
-                         method="relayout",
-                         args=["mapbox.layers",[layers_[3],layers_[-1]]]),
-                ],
-            )
-        ]
-    )
-    
-#     fig.update_layout(
-#     annotations=[
-#         dict(text="Geometry options:", showarrow=False,
-#                              x=-.22, y=1.05, yref="paper", align="left")
-#     ]
-#     )
-    
+        updatemenus=[dict(type="buttons",buttons=[
+                        dict(label="None",
+                             method="relayout",
+                             args=["mapbox.layers",[layers_[-1]]]),
+                        
+                        dict(label="All",
+                             method="relayout",
+                             args=["mapbox.layers",layers_]),
+                        
+                        dict(label="Clusters "+str(THRESHOLDS[-3])+' dBZ',
+                             method="relayout",
+                             args=["mapbox.layers",[layers_[-4]]]),
+                        
+                        dict(label="Clusters "+str(THRESHOLDS[-2])+' dBZ',
+                             method="relayout",
+                             args=["mapbox.layers",[layers_[-3]]]),
+                        
+                        dict(label="Clusters "+str(THRESHOLDS[-1])+' dBZ',
+                             method="relayout",
+                             args=["mapbox.layers",[layers_[-2]]]),
+                        
+                        dict(label="Geometries "+str(THRESHOLDS[0])+' dBZ',
+                             method="relayout",
+                             args=["mapbox.layers",[layers_[0],layers_[-1]]]),
+                        
+                        dict(label="Geometries "+str(THRESHOLDS[1])+' dBZ',
+                             method="relayout",
+                             args=["mapbox.layers",[layers_[1],layers_[-1]]]),
+                        
+                        dict(label="Geometries "+str(THRESHOLDS[2])+' dBZ',
+                             method="relayout",
+                             args=["mapbox.layers",[layers_[2],layers_[-1]]]),
+                        
+                        dict(label="Trajectory",
+                             method="relayout",
+                             args=["mapbox.layers",[layers_[3],layers_[-1]]]),
+                                                ],
+                        )
+                    ]
+                )
     fig.show()
+
+
+def degToCompass(d):
+    dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+    ix = int((d + 11.25)/22.5)
+    return dirs[ix % 16]
+
+
+## WIND PLOT
+def plot_wind(df, style = 'bar'):
+    
+    vel_cols = [c for c in df.columns if 'vel_' in c and 'orig' not in c]
+    angle_cols = [c for c in df.columns if 'angle_' in c and 'orig' not in c]
+    
+    series = df.groupby(['uid']).apply(lambda x: [x.uid.unique()[0],x[vel_cols[0]].values.flatten(),x[angle_cols[0]].values.flatten(),x.timestamp.values])
+
+    wind_dir = pd.DataFrame(columns=['uid','timestamp','velocity','direction'])
+
+    for e in series.keys():
+        for ee in  range(len(series[e][1])):
+            wind_dir = wind_dir.append({'uid':e,
+                                        'timestamp':series[e][-1][ee],
+                                        'velocity':series[e][1][ee],
+                                        'direction':series[e][2][ee]},ignore_index=True)
+
+
+    wind_frame = pd.DataFrame(columns=['uid','direction','strength','velocity'])
+    vel_g = wind_dir.groupby(pd.cut(wind_dir['velocity'], np.arange(0, 100, 10)))
+    for i,g in vel_g:
+        for value in range(len(g.uid.values)):
+            wind_frame = wind_frame.append({'uid':g.uid.values[value],
+                                            'timestamp':g.timestamp.values[value],
+                                            'strength':str(str(i.left)+'-'+str(i.right))+' km/h',
+                                            'direction':g.direction.values[value],
+                                            'velocity':g.velocity.values[value],
+                                            },ignore_index=True)
+
+    if style == 'bar':
+#        wind_frame['angle'] = wind_frame['direction']
+    #     wind_frame['direction'] = wind_frame['direction'].apply(degToCompass)
+        fig = px.bar_polar(wind_frame, r="velocity", theta="direction",template="presentation",
+                       color="strength", labels={"strength": "Wind Speed:"},
+                       base='strength',hover_data=wind_frame,hover_name='uid',start_angle=90,
+                       color_discrete_sequence= px.colors.sequential.Plasma_r)
+    if style == 'scatter':
+        fig = px.scatter_polar(wind_frame, r="velocity", theta="direction",template="presentation",
+                   color="strength", labels={"strength": "Wind Speed:"},
+                   hover_data=wind_frame, hover_name='uid',start_angle=90,
+                   color_discrete_sequence= px.colors.sequential.Plasma_r)
+
+    fig.add_shape(
+        type="circle",
+                xref="paper",
+                yref="paper",
+                x0=0.4,
+                y0=0.4,
+                x1=0.6,
+                y1=0.6,
+                line_color="Black",
+                fillcolor="White",
+                # text="Calm"
+    )
+
+    fig.add_annotation( # add a text callout with arrow
+        text="Wind Rose", x=0.5, y=0.5, showarrow=False
+    )
+
+    fig.update_layout(width=500, height=500)
+    fig.update_layout(title_text='Wind Rose ', title_x=0.5,font_size=12)
+    fig.update_layout(legend=dict(
+        orientation="h",
+        yanchor="top",
+        y=-0.1,
+        xanchor="center",
+        x=0.5),
+        polar=dict(radialaxis=dict(showticklabels=True, ticks='', linewidth=0)
+        )
+    )
+    fig.show()
+    
+    return wind_frame.sort_values(by='timestamp')
