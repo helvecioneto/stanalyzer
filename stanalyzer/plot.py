@@ -175,7 +175,7 @@ def track(dframe,var='DBZc',level=5):
                  "LON: %{lon}   LAT: %{lat}<br><extra></extra>"
     
     ## MARKER AND COLORBAR         
-    markers=dict(size=5, color='black',
+    markers=dict(size=8, color='red',
                                 showscale=True,
                                 colorscale=rainbow,
                                 cmin=-30,cmax=75,
