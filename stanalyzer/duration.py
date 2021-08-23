@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def life_cicle(dframe=None, sort=False):
+def life_cycle(dframe=None, sort=False):
     '''
     This function is used to calculate the duration of the tracked events contained in the tracking DataFrame.
 
