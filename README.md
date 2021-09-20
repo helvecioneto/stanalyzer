@@ -19,14 +19,14 @@ $ conda activate stanalyzer
 ## Examples
 Global variables for translate_data.py
 
-PATH = '/home/helvecioneto/01_IARA/RADAR/iara_beta_v6/output/S201409070000_E201409100000_VDBZc_T20_L5_SPLTTrue_MERGTrue_TCORTrue_PCORFalse.zip'
-DATA_PATH = '/home/helvecioneto/SINAPSE_01/DADOS/sbandradar/'
-VAR_NAME = 'DBZc'
-LEVEL = 5
-THRESHOLD = [20,35,40]
-OUTPUT = '../output/'
-NC_OUTPUT = '../output/data/'
-OUTPUT_FILE = '../output/output_file_tracked'
+PATH = '/home/helvecioneto/01_IARA/RADAR/iara_beta_v6/output/S201409070000_E201409100000_VDBZc_T20_L5_SPLTTrue_MERGTrue_TCORTrue_PCORFalse.zip'<br></br>
+DATA_PATH = '/home/helvecioneto/SINAPSE_01/DADOS/sbandradar/'<br></br>
+VAR_NAME = 'DBZc'<br></br>
+LEVEL = 5<br></br>
+THRESHOLD = [20,35,40]<br></br>
+OUTPUT = '../output/'<br></br>
+NC_OUTPUT = '../output/data/'<br></br>
+OUTPUT_FILE = '../output/output_file_tracked'<br></br>
 
 ### Usage
 
