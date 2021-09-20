@@ -34,7 +34,7 @@ python translate_data.py
 
 ## Jupyter notebook
 
-- Example for EDA tracked files
+<a href="https://nbviewer.jupyter.org/github/helvecioneto/stanalyzer/blob/main/docs/Example.ipynb" target="_blank">Example for EDA tracked files</a>
 
 ## Contact info
 
