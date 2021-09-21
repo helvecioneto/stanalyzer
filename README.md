@@ -1,4 +1,4 @@
-# Storm Tracking Analyzer for Fortracc2
+# Storm Tracking Analyzer
 STAnalyzer
 
 <!-- badges: start -->
