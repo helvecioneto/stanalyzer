@@ -412,10 +412,10 @@ def plot_lines(df, analyze_columns = None, axis_name = None):
     analyze_columns.insert(0,'timestamp')
     analyze_columns.insert(0,'uid')
     
-    orig_df = df.copy()
-    df = df[analyze_columns].sort_values(by='timestamp')
+    orig_df = df.copy().reset_index()
+    orig_df = orig_df[analyze_columns]
 #     df = df.round(2).fillna(0)
-    dfg = df[analyze_columns].groupby('uid')
+    dfg = orig_df[analyze_columns].groupby('uid')
     
     dashs = ['solid','dot','dash','dashdot']
     cnt=0
